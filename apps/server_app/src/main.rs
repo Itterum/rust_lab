@@ -1,3 +1,5 @@
+use std::env;
+
 use axum::{
     Json, Router,
     extract::{Path, State},
@@ -51,11 +53,16 @@ async fn post_user(
 
 #[tokio::main]
 async fn main() {
-    let pool = SqlitePool::connect(
-        "sqlite:C:\\Users\\ivanl\\DataGripProjects\\database_app\\identifier.sqlite?mode=rwc",
-    )
-    .await
-    .unwrap();
+    dotenvy::dotenv().ok();
+
+    let database_url = env::var("DATABASE_URL")
+        .expect("DATABASE_URL is not set. Copy apps/server_app/.env.example to .env and configure it.");
+    let host = env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+
+    let bind_addr = format!("{}:{}", host, port);
+
+    let pool = SqlitePool::connect(&database_url).await.unwrap();
 
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS user (
@@ -74,7 +81,7 @@ async fn main() {
         .route("/user", post(post_user))
         .with_state(pool);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&bind_addr).await.unwrap();
     println!("Listening on: {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
